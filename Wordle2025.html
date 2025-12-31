@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Wordle Wrapped 2025</title>
+    <style>
+        :root {
+            --bg-color: #121213;
+            --text-color: #ffffff;
+            --green: #538d4e;
+            --yellow: #b59f3b;
+            --grey: #3a3a3c;
+            --light-grey: #818384;            
+            --neon-pink: #ff00ff;
+            --neon-blue: #00ffff;
+            --font-main: 'Helvetica Neue', Arial, sans-serif;
+            --font-mono: 'Courier New', Courier, monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none; /* Prevent text selection during tapping */
+        }
+
+        body {
+            background-color: #000;
+            color: var(--text-color);
+            font-family: var(--font-main);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+
+        /* Mobile Container */
+        #app-container {
+            width: 100%;
+            max-width: 420px;
+            height: 100%;
+            max-height: 850px;
+            background-color: var(--bg-color);
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(0,0,0,0.5);
+        }
+
+        /* Progress Bar */
+        #progress-container {
+            position: absolute;
+            top: 10px;
+            left: 0;
+            width: 100%;
+            display: flex;
+            padding: 0 5px;
+            z-index: 10;
+            opacity: 0; /* Hidden on intro */
+            transition: opacity 0.5s;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 4px;
+            background: rgba(255,255,255,0.3);
+            margin: 0 2px;
+            border-radius: 2px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #fff;
+            width: 0%;
+            transition: width 0.1s linear;
+        }
+
+        .progress-fill.completed { width: 100%; }
+        .progress-fill.active { width: 100%; } /* Animation handled in JS */
+
+        /* Screens */
+        .screen {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            text-align: center;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            transition: opacity 0.5s ease-in-out;
+        }
+
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+            z-index: -1;
+        }
+
+        .visible {
+            opacity: 1;
+            pointer-events: auto;
+            z-index: 1;
+        }
+
+        /* Typography */
+        h1 { font-size: 2.5rem; font-weight: 800; margin-bottom: 20px; line-height: 1.1; }
+        h2 { font-size: 1.8rem; font-weight: 700; margin-bottom: 15px; color: var(--green); }
+        h3 { font-size: 1.5rem; font-weight: 600; margin-bottom: 10px; }
+        p { font-size: 1.1rem; margin-bottom: 15px; line-height: 1.5; color: #ddd; }
+        .highlight { color: var(--neon-pink); font-weight: bold; }
+        .highlight-blue { color: var(--neon-blue); font-weight: bold; }
+        .big-stat { font-size: 5rem; font-weight: 900; color: var(--green); margin: 20px 0; text-shadow: 0 0 10px rgba(83, 141, 78, 0.5); }
+        .word-grid { font-family: var(--font-mono); letter-spacing: 2px; text-transform: uppercase; background: var(--grey); padding: 5px 10px; border-radius: 5px; }
+
+        /* Intro Screen */
+        #intro-screen { background: linear-gradient(135deg, #121213 0%, #2a2a2c 100%); }
+        select {
+            padding: 10px 20px;
+            font-size: 1.2rem;
+            margin: 20px 0;
+            border-radius: 25px;
+            border: none;
+            background: #fff;
+            color: #000;
+            outline: none;
+            cursor: pointer;
+        }
+        button {
+            padding: 15px 40px;
+            font-size: 1.2rem;
+            font-weight: bold;
+            background: var(--green);
+            color: #fff;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            box-shadow: 0 4px 15px rgba(83, 141, 78, 0.4);
+            transition: transform 0.2s;
+        }
+        button:active { transform: scale(0.95); }
+
+        /* CHART STYLES (Fixed) */
+        .chart-container {
+            width: 100%;
+            height: 250px; /* Explicit height needed */
+            display: flex;
+            align-items: flex-end; /* Align bars to bottom */
+            justify-content: space-around;
+            margin-top: 20px;
+            padding-bottom: 10px;
+        }
+        .bar-group {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-end;
+            width: 12%;
+            height: 100%; /* Important: inherit height from container */
+        }
+        .bar {
+            width: 100%;
+            background: var(--grey);
+            border-radius: 4px;
+            margin-bottom: 8px;
+            min-height: 5px;
+            /* Animation variables */
+            height: var(--target-height); 
+            animation: growBar 1s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+            transform-origin: bottom;
+        }
+        .bar.highlighted { background: var(--green); }
+        .bar-label { font-size: 0.9rem; color: #fff; font-weight: bold; }
+
+        @keyframes growBar {
+            from { height: 0%; opacity: 0; }
+            to { height: var(--target-height); opacity: 1; }
+        }
+
+        /* Navigation Zones */
+        .nav-zone {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            width: 30%;
+            z-index: 20;
+        }
+        #left-zone { left: 0; }
+        #right-zone { right: 0; width: 70%; }
+
+        /* Leaderboard */
+        .leaderboard { width: 100%; text-align: left; overflow-y: auto; max-height: 60vh; }
+        .lb-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px;
+            border-bottom: 1px solid var(--grey);
+            font-size: 1.1rem;
+        }
+        .lb-rank { color: var(--neon-blue); font-weight: bold; width: 30px; }
+        .lb-name { flex: 1; }
+        .lb-score { font-weight: bold; color: var(--green); }
+
+        /* Decor */
+        .grid-deco {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+            margin: 20px auto;
+            width: 200px;
+        }
+        .tile {
+            width: 100%;
+            aspect-ratio: 1;
+            background: var(--bg-color);
+            border: 2px solid var(--grey);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: bold;
+        }
+        .tile.g { background: var(--green); border-color: var(--green); }
+    </style>
+</head>
+<body>
+
+<div id="app-container">
+    <div id="intro-screen" class="screen visible">
+        <div class="grid-deco">
+            <div class="tile g">2</div><div class="tile g">0</div><div class="tile g">2</div><div class="tile g">5</div><div class="tile"></div>
+            <div class="tile">W</div><div class="tile">R</div><div class="tile">A</div><div class="tile">P</div><div class="tile">D</div>
+        </div>
+        <h1>Wordle Wrapped</h1>
+        <p>A look back at your 2025.</p>
+        
+        <label for="user-select" style="margin-top: 20px; display: block; color: #888;">Who are you?</label>
+        <select id="user-select">
+            <option value="" disabled selected>Select your name...</option>
+        </select>
+        
+        <button onclick="startStory()">Let's Go</button>
+    </div>
+
+    <div id="story-container" class="hidden">
+        <div id="progress-container"></div>
+        <div id="nav-zones">
+            <div id="left-zone" class="nav-zone" onclick="prevSlide()"></div>
+            <div id="right-zone" class="nav-zone" onclick="nextSlide()"></div>
+        </div>
+        <div id="slide-content" class="screen">
+            </div>
+    </div>
+</div>
+
+<script>
+    // EMBEDDED DATA FROM PYTHON PROCESSING
+    const wordleData = {
+  "global": {
+    "top5": [
+      { "name": "Mitch Carter", "avg": 3.950 },
+      { "name": "Jim Witherow", "avg": 3.961 },
+      { "name": "Deputy", "avg": 4.004 },
+      { "name": "Carson Griffith", "avg": 4.047 },
+      { "name": "Jeff Rogers", "avg": 4.133 }
+    ],
+    "addict": { "name": "Alex Boyd", "count": 363 },
+    "genius": { "name": "Carson Griffith", "count": 27 },
+    "hardestWord": { "word": "MANGO", "avg": 7.4 },
+    "easiestWord": { "word": "SOUTH", "avg": 2.8 },
+    "earlyBird": { "name": "Jeff Rogers", "count": 211 },
+    "nightOwl": { "name": "Margaret Tarica", "count": 93 },
+    "likor": { "name": "Mitch Carter", "count": 2942 }
+  },
+  "users": {
+    "Margaret Tarica": { "gamesPlayed": 96, "avgScore": 5.13, "scoreDist": { "1": 0, "2": 8, "3": 27, "4": 35, "5": 17, "6": 9, "X": 62 }, "bestWord": "FANCY, REACH, PEDAL", "bestWordScore": 2 },
+    "Russell Knight": { "gamesPlayed": 67, "avgScore": 5.91, "scoreDist": { "1": 0, "2": 4, "3": 27, "4": 18, "5": 11, "6": 3, "X": 9 }, "bestWord": "CHEAP, STEEP, SPEAR", "bestWordScore": 2 },
+    "Carson Griffith": { "gamesPlayed": 355, "avgScore": 4.05, "scoreDist": { "1": 1, "2": 26, "3": 98, "4": 117, "5": 80, "6": 27, "X": 13 }, "bestWord": "FLINT", "bestWordScore": 1 },
+    "Jeff Rogers": { "gamesPlayed": 350, "avgScore": 4.13, "scoreDist": { "1": 0, "2": 21, "3": 91, "4": 123, "5": 91, "6": 14, "X": 22 }, "bestWord": "TOTAL, REACH, UDDER", "bestWordScore": 2 },
+    "Karianne": { "gamesPlayed": 105, "avgScore": 3.9, "scoreDist": { "1": 0, "2": 8, "3": 34, "4": 43, "5": 16, "6": 3, "X": 6 }, "bestWord": "REACH, TOAST, CHORE", "bestWordScore": 2 },
+    "Mary Fran Wright": { "gamesPlayed": 87, "avgScore": 4.11, "scoreDist": { "1": 1, "2": 5, "3": 31, "4": 25, "5": 20, "6": 5, "X": 8 }, "bestWord": "FUZZY", "bestWordScore": 1 },
+    "Mitch Carter": { "gamesPlayed": 362, "avgScore": 3.95, "scoreDist": { "1": 1, "2": 17, "3": 100, "4": 153, "5": 67, "6": 18, "X": 6 }, "bestWord": "PLAID", "bestWordScore": 1 },
+    "Police Chief": { "gamesPlayed": 78, "avgScore": 3.9, "scoreDist": { "1": 0, "2": 5, "3": 29, "4": 26, "5": 10, "6": 4, "X": 5 }, "bestWord": "PROSE, RIVET, SCORE", "bestWordScore": 2 },
+    "Alex Boyd": { "gamesPlayed": 365, "avgScore": 4.14, "scoreDist": { "1": 0, "2": 13, "3": 80, "4": 148, "5": 88, "6": 29, "X": 5 }, "bestWord": "SUNNY, SPEAR, SPITE", "bestWordScore": 2 },
+    "Scar K": { "gamesPlayed": 320, "avgScore": 4.35, "scoreDist": { "1": 0, "2": 14, "3": 83, "4": 129, "5": 62, "6": 21, "X": 46 }, "bestWord": "CHOSE, RELAX, CLOAK", "bestWordScore": 2 },
+    "Deputy": { "gamesPlayed": 354, "avgScore": 4.0, "scoreDist": { "1": 0, "2": 23, "3": 91, "4": 155, "5": 59, "6": 21, "X": 13 }, "bestWord": "FLINT, RIVET, SCORE", "bestWordScore": 2 },
+    "Robby Thomas": { "gamesPlayed": 90, "avgScore": 4.27, "scoreDist": { "1": 1, "2": 3, "3": 23, "4": 29, "5": 16, "6": 14, "X": 5 }, "bestWord": "TOTAL", "bestWordScore": 1 },
+    "Jim Witherow": { "gamesPlayed": 356, "avgScore": 3.96, "scoreDist": { "1": 1, "2": 20, "3": 116, "4": 124, "5": 67, "6": 21, "X": 13 }, "bestWord": "TRAIL", "bestWordScore": 1 },
+    "Riley Flack": { "gamesPlayed": 207, "avgScore": 4.67, "scoreDist": { "1": 0, "2": 8, "3": 59, "4": 71, "5": 45, "6": 19, "X": 56 }, "bestWord": "CHEAP, RAPID, TRAIL", "bestWordScore": 2 },
+    "Randall K": { "gamesPlayed": 307, "avgScore": 4.66, "scoreDist": { "1": 0, "2": 11, "3": 69, "4": 114, "5": 72, "6": 25, "X": 72 }, "bestWord": "FLINT, TOAST, RIVET", "bestWordScore": 2 },
+    "Wordle McCordle": { "gamesPlayed": 259, "avgScore": 4.34, "scoreDist": { "1": 0, "2": 7, "3": 48, "4": 105, "5": 59, "6": 32, "X": 10 }, "bestWord": "WEEDY, TROUT, SOUTH", "bestWordScore": 2 }
+  }
+};
+
+    // State
+    let currentUser = null;
+    let currentSlideIndex = 0;
+    let slides = [];
+    let slideTimer;
+
+    // Initialize Dropdown
+    const userSelect = document.getElementById('user-select');
+    Object.keys(wordleData.users).sort().forEach(user => {
+        const option = document.createElement('option');
+        option.value = user;
+        option.textContent = user;
+        userSelect.appendChild(option);
+    });
+
+    // Slide Generators
+    function generateSlides(user) {
+        const stats = wordleData.users[user];
+        const g = wordleData.global;
+
+        return [
+            // Slide 1: Welcome
+            {
+                render: () => `
+                    <h1>Hi, <span class="highlight">${user.split(' ')[0]}</span>.</h1>
+                    <p>It's been quite a year.</p>
+                    <p>Ready to see your 2025 Wordle Wrapped?</p>
+                `,
+                duration: 4000
+            },
+            // Slide 2: Games Played
+            {
+                render: () => `
+                    <h2>The Grind</h2>
+                    <p>You played</p>
+                    <div class="big-stat">${stats.gamesPlayed}</div>
+                    <p>games in 2025.</p>
+                    ${stats.gamesPlayed > 300 ? "<p class='highlight-blue'>That's some serious dedication.</p>" : "<p>Quality over quantity.</p>"}
+                `,
+                duration: 5000
+            },
+            // Slide 3: Average Score
+            {
+                render: () => `
+                    <h2>Your Accuracy</h2>
+                    <p>Your average score was</p>
+                    <div class="big-stat">${stats.avgScore}</div>
+                    <p>guesses per word.</p>
+                `,
+                duration: 4000
+            },
+            // Slide 4: Chart
+            {
+                render: () => {
+                    const maxVal = Math.max(...Object.values(stats.scoreDist));
+                    const maxKeys = Object.keys(stats.scoreDist).filter(k => stats.scoreDist[k] === maxVal);
+                    let chartHtml = '<div class="chart-container">';
+                    ['1','2','3','4','5','6','X'].forEach(key => {
+                        const val = stats.scoreDist[key];
+                        // Max height is 85% to leave room for visual breathing space
+                        const heightPct = maxVal > 0 ? (val / maxVal) * 85 : 0;
+                        const isHigh = maxKeys.includes(key); 
+                        // We use a CSS variable for the height so we can animate it
+                        chartHtml += `
+                            <div class="bar-group">
+                                <div class="bar ${isHigh ? 'highlighted' : ''}" style="--target-height: ${heightPct}%;"></div>
+                                <div class="bar-label">${key}</div>
+                            </div>
+                        `;
+                    });
+                    chartHtml += '</div>';
+                    return `<h2>Your Pattern</h2><p>Score Distribution:</p>${chartHtml}`;
+                },
+                duration: 6000
+            },
+            // Slide 5: Best Word
+            {
+                render: () => `
+                    <h2>Best Moment</h2>
+                    <p>You crushed it on:</p>
+                    <h1 class="highlight-blue">${stats.bestWord}</h1>
+                    <p>Score: ${stats.bestWordScore}</p>
+                `,
+                duration: 4000
+            },
+            // Slide 6: Transition
+            {
+                render: () => `
+                    <h1>The Squad</h1>
+                    <p>How do you stack up against everyone else?</p>
+                `,
+                duration: 3000
+            },
+            // Slide 7: The Addict & Genius
+            {
+                render: () => `
+                    <h2>The Hall of Fame</h2>
+                    <div style="margin-bottom: 30px;">
+                        <p>THE ADDICT (Most Plays)</p>
+                        <h3 class="highlight">${g.addict.name}</h3>
+                        <p>${g.addict.count} games</p>
+                    </div>
+                    <div>
+                        <p>THE GENIUS (Most 1s & 2s)</p>
+                        <h3 class="highlight-blue">${g.genius.name}</h3>
+                        <p>${g.genius.count} times</p>
+                    </div>
+                `,
+                duration: 6000
+            },
+            // Slide 8: The Likor & Time
+            {
+                render: () => `
+                    <h2>Vibes & Time</h2>
+                    <div style="margin-bottom: 20px;">
+                        <p>THE HYPE MAN (Most Likes)</p>
+                        <h3 class="highlight">${g.likor.name}</h3>
+                        <p>${g.likor.count} likes given</p>
+                    </div>
+                    <p style="font-size:0.9rem">Early Bird: ${g.earlyBird.name}<br>Night Owl: ${g.nightOwl.name}</p>
+                `,
+                duration: 6000
+            },
+            // Slide 9: Highs and Lows
+            {
+                render: () => `
+                    <h2>Highs & Lows</h2>
+                    <p>HARDEST WORD</p>
+                    <div class="word-grid" style="color:#ff4444">${g.hardestWord.word}</div>
+                    <p>Avg Score: ${g.hardestWord.avg}</p>
+                    <br>
+                    <p>EASIEST WORD</p>
+                    <div class="word-grid" style="color:var(--green)">${g.easiestWord.word}</div>
+                    <p>Avg Score: ${g.easiestWord.avg}</p>
+                `,
+                duration: 5000
+            },
+            // Slide 10: Leaderboard
+            {
+                render: () => {
+                    let listHtml = '<div class="leaderboard">';
+                    g.top5.forEach((p, i) => {
+                        listHtml += `
+                            <div class="lb-item">
+                                <div class="lb-rank">#${i+1}</div>
+                                <div class="lb-name">${p.name}</div>
+                                <div class="lb-score">${p.avg}</div>
+                            </div>
+                        `;
+                    });
+                    listHtml += '</div>';
+                    return `
+                        <h2>Top 5 Average</h2>
+                        ${listHtml}
+                        <button onclick="location.reload()" style="margin-top:20px; font-size:1rem; padding: 10px 20px;">Replay</button>
+                    `;
+                },
+                duration: 10000
+            }
+        ];
+    }
+
+    // Functions
+    function startStory() {
+        if (!userSelect.value) return alert("Please pick a name!");
+        currentUser = userSelect.value;
+        document.getElementById('intro-screen').classList.replace('visible', 'hidden');
+        document.getElementById('story-container').classList.replace('hidden', 'visible'); // Make sure visible class is added
+        document.getElementById('story-container').style.opacity = 1; // Explicit opacity
+        slides = generateSlides(currentUser);
+        initProgressBars();
+        showSlide(0);
+    }
+
+    function initProgressBars() {
+        const c = document.getElementById('progress-container');
+        c.innerHTML = '';
+        slides.forEach(() => {
+            const b = document.createElement('div');
+            b.className = 'progress-bar';
+            b.appendChild(document.createElement('div')).className = 'progress-fill';
+            c.appendChild(b);
+        });
+        setTimeout(() => c.style.opacity = 1, 100);
+    }
+
+    function showSlide(index) {
+        if (index >= slides.length) return location.reload();
+        if (index < 0) index = 0;
+        currentSlideIndex = index;
+        const s = slides[index];
+        const el = document.getElementById('slide-content');
+        
+        // Render
+        el.innerHTML = s.render();
+        
+        // Progress Bars
+        document.querySelectorAll('.progress-fill').forEach((f, i) => {
+            f.className = 'progress-fill';
+            f.style.width = i < index ? '100%' : '0%';
+            f.style.transition = 'none';
+            if (i === index) {
+                f.classList.add('active');
+                // Force reflow
+                void f.offsetWidth;
+                f.style.transition = `width ${s.duration}ms linear`;
+                f.style.width = '100%';
+            }
+        });
+
+        clearTimeout(slideTimer);
+        slideTimer = setTimeout(nextSlide, s.duration);
+    }
+    
+    function nextSlide() { showSlide(currentSlideIndex + 1); }
+    function prevSlide() { showSlide(currentSlideIndex - 1); }
+
+</script>
+
+</body>
+</html>
